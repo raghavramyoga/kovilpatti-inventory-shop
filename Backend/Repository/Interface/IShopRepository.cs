@@ -11,4 +11,5 @@ public interface IShopRepository
     Task<string> NextCodeAsync(CancellationToken ct = default);
     Task<Guid> CreateAsync(Shop shop, Guid userId, CancellationToken ct = default);
     Task<bool> UpdateAsync(Shop shop, Guid userId, CancellationToken ct = default);
+    Task<bool> SoftDeleteAsync(Guid id, Guid userId, CancellationToken ct = default);
 }

@@ -11,4 +11,5 @@ public interface IInventoryRepository
     Task<string> NextCodeAsync(CancellationToken ct = default);
     Task<Guid> CreateAsync(Inventory inventory, Guid userId, CancellationToken ct = default);
     Task<bool> UpdateAsync(Inventory inventory, Guid userId, CancellationToken ct = default);
+    Task<bool> SoftDeleteAsync(Guid id, Guid userId, CancellationToken ct = default);
 }

@@ -101,6 +101,15 @@ public class ShopService(
         return await GetAsync(id, ct);
     }
 
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var userId = currentUser.UserId
+            ?? throw new UnauthorizedException("Authenticated user required.");
+
+        var ok = await shops.SoftDeleteAsync(id, userId, ct);
+        if (!ok) throw new NotFoundException($"Shop '{id}' not found.");
+    }
+
     private static ShopDto MapToDto(Shop s) => new(
         Id:             s.Id,
         Code:           s.Code,

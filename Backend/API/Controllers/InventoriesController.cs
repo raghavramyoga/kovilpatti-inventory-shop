@@ -30,4 +30,12 @@ public class InventoriesController(IInventoryService inventories) : ControllerBa
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<InventoryDto>> Update(Guid id, [FromBody] UpdateInventoryRequest request, CancellationToken ct)
         => Ok(await inventories.UpdateAsync(id, request, ct));
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        await inventories.DeleteAsync(id, ct);
+        return NoContent();
+    }
 }

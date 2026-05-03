@@ -8,4 +8,5 @@ public interface IShopService
     Task<ShopDto> GetAsync(Guid id, CancellationToken ct = default);
     Task<ShopDto> CreateAsync(CreateShopRequest request, CancellationToken ct = default);
     Task<ShopDto> UpdateAsync(Guid id, UpdateShopRequest request, CancellationToken ct = default);
+    Task DeleteAsync(Guid id, CancellationToken ct = default);
 }

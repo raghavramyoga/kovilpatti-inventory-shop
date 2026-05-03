@@ -13,4 +13,5 @@ public interface IUserRepository
     Task<bool> UsernameExistsAsync(string username, CancellationToken ct = default);
     Task<bool> UpdateAsync(User user, Guid userId, CancellationToken ct = default);
     Task<bool> UpdatePasswordAsync(Guid id, string passwordHash, Guid userId, CancellationToken ct = default);
+    Task<bool> SoftDeleteAsync(Guid id, Guid userId, CancellationToken ct = default);
 }

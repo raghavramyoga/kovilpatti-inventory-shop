@@ -30,4 +30,12 @@ public class ShopsController(IShopService shops) : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ShopDto>> Update(Guid id, [FromBody] UpdateShopRequest request, CancellationToken ct)
         => Ok(await shops.UpdateAsync(id, request, ct));
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        await shops.DeleteAsync(id, ct);
+        return NoContent();
+    }
 }

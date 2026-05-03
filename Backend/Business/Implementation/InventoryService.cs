@@ -89,6 +89,15 @@ public class InventoryService(
         return await GetAsync(id, ct);
     }
 
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var userId = currentUser.UserId
+            ?? throw new UnauthorizedException("Authenticated user required.");
+
+        var ok = await inventories.SoftDeleteAsync(id, userId, ct);
+        if (!ok) throw new NotFoundException($"Inventory '{id}' not found.");
+    }
+
     private static InventoryDto MapToDto(Inventory i) => new(
         Id:                i.Id,
         Code:              i.Code,

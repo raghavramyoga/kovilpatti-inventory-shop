@@ -580,6 +580,50 @@ BEGIN
 END;
 $$;
 
+-- ============== Soft delete (active = false) =====================
+
+CREATE OR REPLACE FUNCTION fn_inventory_soft_delete(p_id uuid, p_user_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE inventories
+  SET active     = false,
+      updated_by = p_user_id,
+      updated_at = now()
+  WHERE id = p_id;
+
+  RETURN FOUND;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION fn_shop_soft_delete(p_id uuid, p_user_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE shops
+  SET active     = false,
+      updated_by = p_user_id,
+      updated_at = now()
+  WHERE id = p_id;
+
+  RETURN FOUND;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION fn_user_soft_delete(p_id uuid, p_user_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE users
+  SET active     = false,
+      updated_by = p_user_id,
+      updated_at = now()
+  WHERE id = p_id;
+
+  RETURN FOUND;
+END;
+$$;
+
 COMMIT;
 
 -- ============================================================

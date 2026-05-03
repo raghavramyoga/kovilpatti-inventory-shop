@@ -8,4 +8,5 @@ public interface IInventoryService
     Task<InventoryDto> GetAsync(Guid id, CancellationToken ct = default);
     Task<InventoryDto> CreateAsync(CreateInventoryRequest request, CancellationToken ct = default);
     Task<InventoryDto> UpdateAsync(Guid id, UpdateInventoryRequest request, CancellationToken ct = default);
+    Task DeleteAsync(Guid id, CancellationToken ct = default);
 }

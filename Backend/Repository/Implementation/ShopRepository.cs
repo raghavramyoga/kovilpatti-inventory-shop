@@ -91,4 +91,12 @@ public class ShopRepository(IDbConnectionFactory factory) : IShopRepository
             p_user_id         = userId
         }, cancellationToken: ct));
     }
+
+    public async Task<bool> SoftDeleteAsync(Guid id, Guid userId, CancellationToken ct = default)
+    {
+        using var conn = await factory.CreateOpenConnectionAsync(ct);
+        const string sql = "SELECT fn_shop_soft_delete(@p_id, @p_user_id)";
+        return await conn.ExecuteScalarAsync<bool>(
+            new CommandDefinition(sql, new { p_id = id, p_user_id = userId }, cancellationToken: ct));
+    }
 }

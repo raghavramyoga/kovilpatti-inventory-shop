@@ -35,4 +35,11 @@ public class UsersController(IUserService users) : ControllerBase
         await users.ResetPasswordAsync(id, request, ct);
         return NoContent();
     }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        await users.DeleteAsync(id, ct);
+        return NoContent();
+    }
 }

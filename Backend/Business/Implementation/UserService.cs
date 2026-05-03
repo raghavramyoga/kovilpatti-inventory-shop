@@ -138,6 +138,21 @@ public class UserService(
         if (!ok) throw new NotFoundException($"User '{id}' not found.");
     }
 
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var existing = await users.GetByIdAsync(id, ct)
+            ?? throw new NotFoundException($"User '{id}' not found.");
+
+        if (existing.Role == UserRole.Admin)
+            throw new ForbiddenException("Cannot delete the admin user via this endpoint.");
+
+        var updater = currentUser.UserId
+            ?? throw new UnauthorizedException("Authenticated user required.");
+
+        var ok = await users.SoftDeleteAsync(id, updater, ct);
+        if (!ok) throw new NotFoundException($"User '{id}' not found.");
+    }
+
     private static UserRole ParseRole(string role) => role switch
     {
         "ShopUser"  => UserRole.ShopUser,
