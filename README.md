@@ -99,3 +99,55 @@ JWT lifetime is 1 hour. The token includes `userId`, `role`, and either `shopId`
 - **Auto-generated codes** — leave `code` blank on create and the DB allocates the next sequential value (`P001`, `INV001`, `SHP001`).
 - **Audit columns** — `created_at`, `created_by`, `updated_at`, `updated_by` exist on every table; the API stamps them automatically on every write.
 - **Reserved usernames** — `admin` and `inventory` cannot be used by staff; only the seeded admin row uses `admin`.
+
+## Environments
+
+Three environments, picked via `ASPNETCORE_ENVIRONMENT`:
+
+| Env | When | Where it runs | DB |
+|-----|------|---------------|-----|
+| **Development** | Local dev | Your machine | Local Postgres `sks_inventory` |
+| **UAT** | Client testing / staging | Railway (UAT service) | Supabase (UAT project) |
+| **Production** | Live | Railway (Prod service) | Supabase (Prod project) |
+
+Per-env settings live in `appsettings.{Env}.json`. Secrets (connection string, JWT key, admin seed password) are **never committed** — they come from `dotnet user-secrets` locally and from platform env vars on Railway.
+
+### Required env vars (UAT and Production on Railway)
+
+.NET reads nested config keys with `__` as the separator, e.g. `Jwt:SigningKey` → `Jwt__SigningKey`.
+
+```
+ASPNETCORE_ENVIRONMENT       = UAT     (or Production)
+ASPNETCORE_URLS              = http://+:${PORT}
+ConnectionStrings__Default   = Host=db.<project>.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=<pwd>;SSL Mode=Require;Trust Server Certificate=true
+Jwt__SigningKey              = <32+ random chars, generate fresh per env>
+Jwt__Issuer                  = (optional override of appsettings)
+Jwt__Audience                = (optional override of appsettings)
+Seed__AdminPassword          = <strong password — only required on first deploy>
+```
+
+If `Seed__AdminPassword` is empty/missing, the admin auto-seed is **skipped**. After the first successful deploy creates the admin row, you can remove this env var; subsequent boots find an admin and skip seeding regardless.
+
+### CORS
+
+Allowed origins are read from `Cors:AllowedOrigins` per environment. Empty list = all cross-origin requests rejected (fail-secure). Update `appsettings.UAT.json` and `appsettings.Production.json` with the Vercel URLs once they're known.
+
+### Health check
+
+`GET /health` returns `{ "status": "ok", "env": "UAT", "time": "..." }` — anonymous, useful for Railway uptime probes.
+
+### Swagger visibility
+
+Always on in **Development**. In **UAT** / **Production**, controlled by `Swagger:Enabled` in the per-env appsettings file (default: on for UAT, off for Prod).
+
+## Deployment (Phase 1)
+
+1. **Database (Supabase, one project per env)**
+   - Create the project, copy the connection string from Settings → Database.
+   - In SQL Editor, paste `DB/phase1_init.sql` (comment out the `CREATE DATABASE` and `\c` lines — Supabase uses the default `postgres` DB).
+   - Then paste `DB/phase1_procedures.sql`.
+2. **Backend (Railway, one service per env)**
+   - Deploy from this GitHub repo, root directory `Backend/API`.
+   - Set the env vars listed above. Make sure `ASPNETCORE_ENVIRONMENT` matches the target.
+   - Generate a public domain (Settings → Networking).
+3. **Frontend (Vercel)** — set `VITE_API_URL` to the Railway URL for each env, redeploy.
