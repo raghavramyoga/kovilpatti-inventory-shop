@@ -23,14 +23,16 @@ LANGUAGE sql STABLE AS $$
   SELECT u.id, u.username, u.password_hash, u.full_name, u.role,
          u.shop_id, u.inventory_id, u.active
   FROM users u
-  WHERE u.username = p_username AND u.active = true
+  WHERE u.username = p_username
+    AND u.active = true
+    AND u.is_deleted = false
   LIMIT 1;
 $$;
 
 CREATE OR REPLACE FUNCTION fn_user_any_admin()
 RETURNS boolean
 LANGUAGE sql STABLE AS $$
-  SELECT EXISTS(SELECT 1 FROM users WHERE role = 'admin');
+  SELECT EXISTS(SELECT 1 FROM users WHERE role = 'admin' AND is_deleted = false);
 $$;
 
 CREATE OR REPLACE FUNCTION fn_user_create(
@@ -61,7 +63,7 @@ $$;
 CREATE OR REPLACE FUNCTION fn_category_exists(p_id int)
 RETURNS boolean
 LANGUAGE sql STABLE AS $$
-  SELECT EXISTS(SELECT 1 FROM categories WHERE id = p_id);
+  SELECT EXISTS(SELECT 1 FROM categories WHERE id = p_id AND is_deleted = false);
 $$;
 
 CREATE OR REPLACE FUNCTION fn_category_list()
@@ -73,6 +75,7 @@ RETURNS TABLE (
 LANGUAGE sql STABLE AS $$
   SELECT c.id, c.name, c.active
   FROM categories c
+  WHERE c.is_deleted = false
   ORDER BY c.name;
 $$;
 
@@ -101,7 +104,8 @@ LANGUAGE sql STABLE AS $$
          p.mrp, p.purchase_price, p.active
   FROM products p
   INNER JOIN categories c ON c.id = p.category_id
-  WHERE (p_search IS NULL
+  WHERE p.is_deleted = false
+    AND (p_search IS NULL
          OR p.name ILIKE '%' || p_search || '%'
          OR p.code ILIKE '%' || p_search || '%')
     AND (p_category_id IS NULL OR p.category_id = p_category_id)
@@ -128,7 +132,7 @@ LANGUAGE sql STABLE AS $$
          p.mrp, p.purchase_price, p.active
   FROM products p
   INNER JOIN categories c ON c.id = p.category_id
-  WHERE p.id = p_id
+  WHERE p.id = p_id AND p.is_deleted = false
   LIMIT 1;
 $$;
 
@@ -225,10 +229,10 @@ RETURNS boolean
 LANGUAGE plpgsql AS $$
 BEGIN
   UPDATE products
-  SET active     = false,
+  SET is_deleted = true,
       updated_by = p_user_id,
       updated_at = now()
-  WHERE id = p_id;
+  WHERE id = p_id AND is_deleted = false;
 
   RETURN FOUND;
 END;
@@ -250,6 +254,7 @@ LANGUAGE sql STABLE AS $$
   SELECT i.id, i.code, i.name, i.address,
          i.contact_phone, i.contact_person_name, i.active
   FROM inventories i
+  WHERE i.is_deleted = false
   ORDER BY i.code;
 $$;
 
@@ -267,14 +272,14 @@ LANGUAGE sql STABLE AS $$
   SELECT i.id, i.code, i.name, i.address,
          i.contact_phone, i.contact_person_name, i.active
   FROM inventories i
-  WHERE i.id = p_id
+  WHERE i.id = p_id AND i.is_deleted = false
   LIMIT 1;
 $$;
 
 CREATE OR REPLACE FUNCTION fn_inventory_exists(p_id uuid)
 RETURNS boolean
 LANGUAGE sql STABLE AS $$
-  SELECT EXISTS(SELECT 1 FROM inventories WHERE id = p_id);
+  SELECT EXISTS(SELECT 1 FROM inventories WHERE id = p_id AND is_deleted = false);
 $$;
 
 CREATE OR REPLACE FUNCTION fn_inventory_exists_by_code(p_code varchar)
@@ -375,6 +380,7 @@ LANGUAGE sql STABLE AS $$
          s.inventory_id, i.name AS inventory_name, s.active
   FROM shops s
   INNER JOIN inventories i ON i.id = s.inventory_id
+  WHERE s.is_deleted = false
   ORDER BY s.code;
 $$;
 
@@ -397,7 +403,7 @@ LANGUAGE sql STABLE AS $$
          s.inventory_id, i.name AS inventory_name, s.active
   FROM shops s
   INNER JOIN inventories i ON i.id = s.inventory_id
-  WHERE s.id = p_id
+  WHERE s.id = p_id AND s.is_deleted = false
   LIMIT 1;
 $$;
 
@@ -487,7 +493,7 @@ $$;
 CREATE OR REPLACE FUNCTION fn_shop_exists(p_id uuid)
 RETURNS boolean
 LANGUAGE sql STABLE AS $$
-  SELECT EXISTS(SELECT 1 FROM shops WHERE id = p_id);
+  SELECT EXISTS(SELECT 1 FROM shops WHERE id = p_id AND is_deleted = false);
 $$;
 
 -- ============== Users (Staff CRUD) ===============================
@@ -519,7 +525,7 @@ LANGUAGE sql STABLE AS $$
   FROM users u
   LEFT JOIN shops s       ON s.id = u.shop_id
   LEFT JOIN inventories i ON i.id = u.inventory_id
-  WHERE u.role <> 'admin'
+  WHERE u.role <> 'admin' AND u.is_deleted = false
   ORDER BY u.username;
 $$;
 
@@ -544,7 +550,7 @@ LANGUAGE sql STABLE AS $$
   FROM users u
   LEFT JOIN shops s       ON s.id = u.shop_id
   LEFT JOIN inventories i ON i.id = u.inventory_id
-  WHERE u.id = p_id
+  WHERE u.id = p_id AND u.is_deleted = false
   LIMIT 1;
 $$;
 
@@ -592,17 +598,19 @@ BEGIN
 END;
 $$;
 
--- ============== Soft delete (active = false) =====================
+-- ============== Soft delete (sets is_deleted = true) =============
+--   `active` is left alone — it remains a separate business flag.
+--   Lists / get / FK-exists checks all filter is_deleted = false.
 
 CREATE OR REPLACE FUNCTION fn_inventory_soft_delete(p_id uuid, p_user_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql AS $$
 BEGIN
   UPDATE inventories
-  SET active     = false,
+  SET is_deleted = true,
       updated_by = p_user_id,
       updated_at = now()
-  WHERE id = p_id;
+  WHERE id = p_id AND is_deleted = false;
 
   RETURN FOUND;
 END;
@@ -613,10 +621,10 @@ RETURNS boolean
 LANGUAGE plpgsql AS $$
 BEGIN
   UPDATE shops
-  SET active     = false,
+  SET is_deleted = true,
       updated_by = p_user_id,
       updated_at = now()
-  WHERE id = p_id;
+  WHERE id = p_id AND is_deleted = false;
 
   RETURN FOUND;
 END;
@@ -627,10 +635,10 @@ RETURNS boolean
 LANGUAGE plpgsql AS $$
 BEGIN
   UPDATE users
-  SET active     = false,
+  SET is_deleted = true,
       updated_by = p_user_id,
       updated_at = now()
-  WHERE id = p_id;
+  WHERE id = p_id AND is_deleted = false;
 
   RETURN FOUND;
 END;
