@@ -29,3 +29,10 @@ Desktop.ini
 # Misc
 *.bak
 *.tmp
+
+# Frontend lives in its own GitHub repo (shop-to-godown-order-management)
+# and is deployed to Vercel from there. This folder is here only for local
+# convenience — the outer mono-repo does not track it.
+./node_modules/
+./dist/
+./build/

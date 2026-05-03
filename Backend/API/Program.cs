@@ -45,16 +45,32 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// CORS — origins come from Cors:AllowedOrigins per environment.
-// Empty list = all cross-origin requests rejected (fail-secure).
+// CORS
+//   Development: allow any localhost origin (Vite picks ports dynamically — 5173,
+//   5174, 3000, etc.). Production / UAT: lock down to the configured allowlist.
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
 
 builder.Services.AddCors(opts =>
-    opts.AddDefaultPolicy(p => p
-        .WithOrigins(allowedOrigins)
-        .AllowAnyMethod()
-        .AllowAnyHeader()));
+{
+    opts.AddDefaultPolicy(p =>
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            p.SetIsOriginAllowed(origin =>
+                Uri.TryCreate(origin, UriKind.Absolute, out var u)
+                    && (u.Host == "localhost" || u.Host == "127.0.0.1"))
+             .AllowAnyMethod()
+             .AllowAnyHeader();
+        }
+        else
+        {
+            p.WithOrigins(allowedOrigins)
+             .AllowAnyMethod()
+             .AllowAnyHeader();
+        }
+    });
+});
 
 // Health checks — "api" is a trivial liveness check; "database" pings Postgres.
 builder.Services.AddHealthChecks()
@@ -92,8 +108,18 @@ if (enableSwagger)
 }
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
-app.UseHttpsRedirection();
+
+// CORS must run before HttpsRedirection / Authentication so preflight (OPTIONS)
+// responses include Access-Control-* headers and aren't redirected away.
 app.UseCors();
+
+// HttpsRedirection only outside Development — locally we listen on http only,
+// and Railway/Vercel terminate TLS at the edge so redirecting in-app is wrong.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 

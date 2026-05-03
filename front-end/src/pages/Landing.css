@@ -1,0 +1,47 @@
+/* Landing page — extracted from inline style blocks.
+   Tailwind utility classes remain on the JSX; only literal CSS
+   (colors, borders, box-shadows) lives here. */
+
+.landing-header-badge {
+  background-color: #1F1F1F;
+  box-shadow: 4px 4px 0 0 #FCD835;
+}
+
+.landing-welcome-card {
+  border: 2px solid #1F1F1F;
+  box-shadow: 8px 8px 0 0 #FCD835;
+}
+
+.landing-cta-card {
+  background-color: #FCD835;
+  border: 2px solid #1F1F1F;
+  box-shadow: 8px 8px 0 0 #1F1F1F;
+}
+
+/* Compact login row — avatar + title + description + arrow.
+   Avatar background changes per role; letter is always white. */
+.landing-login-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: #FFFFFF;
+  flex-shrink: 0;
+}
+
+.landing-login-avatar--admin     { background-color: #1F1F1F; color: #FCD835; }
+.landing-login-avatar--shop-user { background-color: #2E7D32; }
+.landing-login-avatar--inventory { background-color: #0277BD; }
+
+/* Note: the original inline style used `border: '1px solid #1F1F1F/20'`
+   which is invalid CSS (the `/20` opacity shorthand only works in Tailwind).
+   Preserving the same broken declaration so the rendered UI is unchanged —
+   browsers drop the invalid border, leaving the pill borderless as before. */
+.landing-credentials {
+  background-color: #FFFFFF;
+  border: 1px solid #1F1F1F/20;
+}

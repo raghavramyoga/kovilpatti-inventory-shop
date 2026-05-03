@@ -1,0 +1,14 @@
+/* Layout — admin shell header + mobile drawer overrides. */
+
+.layout-header {
+  background-color: #FFFFFF;
+  border-bottom: 3px solid #FCD835;
+  box-shadow: 0 4px 16px -4px rgba(31, 31, 31, 0.12);
+}
+
+/* MUI Drawer paper override — was inside an sx block targeting `& .MuiDrawer-paper`. */
+.layout-drawer .MuiDrawer-paper {
+  width: 256px;
+  box-sizing: border-box;
+  border: none;
+}

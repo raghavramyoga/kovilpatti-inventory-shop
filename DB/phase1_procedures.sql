@@ -64,6 +64,18 @@ LANGUAGE sql STABLE AS $$
   SELECT EXISTS(SELECT 1 FROM categories WHERE id = p_id);
 $$;
 
+CREATE OR REPLACE FUNCTION fn_category_list()
+RETURNS TABLE (
+  id     int,
+  name   varchar,
+  active boolean
+)
+LANGUAGE sql STABLE AS $$
+  SELECT c.id, c.name, c.active
+  FROM categories c
+  ORDER BY c.name;
+$$;
+
 -- ============== Products =========================================
 
 CREATE OR REPLACE FUNCTION fn_product_list(
