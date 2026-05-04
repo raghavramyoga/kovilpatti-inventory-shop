@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "dotnet",
+  "packages": {
+    "mise": {
+      "dotnet": "9"
+    }
+  },
+  "steps": {
+    "build": {
+      "commands": [
+        "dotnet publish API/KovilpattiSnacks.API.csproj -c Release -o /app/publish"
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "dotnet /app/publish/KovilpattiSnacks.API.dll"
+  }
+}
