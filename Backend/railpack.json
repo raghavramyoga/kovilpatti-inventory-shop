@@ -2,9 +2,7 @@
   "$schema": "https://schema.railpack.com",
   "provider": "dotnet",
   "packages": {
-    "mise": {
-      "dotnet": "9"
-    }
+    "dotnet": "9"
   },
   "steps": {
     "build": {
