@@ -7,7 +7,7 @@
   "steps": {
     "build": {
       "commands": [
-        "dotnet publish API/KovilpattiSnacks.API.csproj -c Release -o /app/publish"
+        "dotnet publish /app/API/KovilpattiSnacks.API.csproj -c Release -o /app/publish"
       ]
     }
   },
