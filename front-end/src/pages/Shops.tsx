@@ -278,7 +278,7 @@ function ShopFormDialog({ open, shop, inventories, submitting, submitError, onCl
             <TextField label="Contact Number 2" value={contactPhone2} onChange={e => setContactPhone2(e.target.value)} size="small" placeholder="(optional)" disabled={submitting} />
           </Box>
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-            <TextField label="GSTIN" value={gstin} onChange={e => setGstin(e.target.value.toUpperCase())} size="small" placeholder="(15 chars, optional)" inputProps={{ maxLength: 15 }} disabled={submitting} />
+            <TextField label="GSTIN" value={gstin} onChange={e => setGstin(e.target.value.toUpperCase())} size="small" placeholder="(15 chars, optional)" slotProps={{ htmlInput: { maxLength: 15 } }} disabled={submitting} />
             <TextField select label="Inventory" value={inventoryId} onChange={e => setInventoryId(e.target.value)} required size="small" disabled={submitting}>
               {inventories.map(inv => (
                 <MenuItem key={inv.id} value={inv.id}>{inv.code} — {inv.name}</MenuItem>
