@@ -47,7 +47,7 @@ type StaffInput = Omit<Staff, 'id'>
 
 type AppContextType = {
   currentUser: CurrentUser
-  login: (username: string, password: string) => Promise<boolean>
+  login: (username: string, password: string) => Promise<CurrentUser>
   logout: () => void
 
   products: Product[]
@@ -110,22 +110,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   // Real auth — POST /api/auth/login. Stores JWT in tokenStore so the
-  // API client attaches it to subsequent requests automatically.
-  const login = async (username: string, password: string): Promise<boolean> => {
+  // API client attaches it to subsequent requests automatically. Returns
+  // the new user on success, or null on failure (callers route by role).
+  const login = async (username: string, password: string): Promise<CurrentUser> => {
     try {
       const res = await authApi.login({ username, password })
       tokenStore.set(res.token)
-      setCurrentUser({
+      const user = {
         userId: res.userId,
         username: res.username,
         fullName: res.fullName,
         role: res.role,
         shopId: res.shopId,
         inventoryId: res.inventoryId,
-      })
-      return true
+      }
+      setCurrentUser(user)
+      return user
     } catch {
-      return false
+      return null
     }
   }
 
