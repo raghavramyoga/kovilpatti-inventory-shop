@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, Edit2, Trash2, X, Package, Upload } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Package, Upload, Filter as FilterIcon } from 'lucide-react'
 import {
-  Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
+  Alert, Badge, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   FormControlLabel, IconButton, MenuItem, Paper, TextField,
 } from '@mui/material'
 import { DataGrid, type GridColDef } from '@mui/x-data-grid'
@@ -10,7 +10,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useImportProducts } from '../hooks/useProducts'
 import { useCategories } from '../hooks/useCategories'
 import type {
-  ProductDto, CreateProductRequest, UpdateProductRequest, ImportProductsResult,
+  ProductDto, CreateProductRequest, UpdateProductRequest, ImportProductsResult, ProductListFilters,
 } from '../api/products/types'
 import type { CategoryDto } from '../api/categories/types'
 import { ValidationError } from '../api/errors'
@@ -33,7 +33,8 @@ type FormValues = {
 }
 
 export default function Products() {
-  const list = useProducts()
+  const [filters, setFilters] = useState<ProductListFilters>({})
+  const list = useProducts(filters)
   const categoriesQuery = useCategories()
   const create = useCreateProduct()
   const update = useUpdateProduct()
@@ -42,6 +43,10 @@ export default function Products() {
   const [formMode, setFormMode] = useState<FormMode>({ kind: 'closed' })
   const [pendingDelete, setPendingDelete] = useState<ProductDto | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
+
+  const activeFilterCount =
+    (filters.search ? 1 : 0) + (filters.categoryId != null ? 1 : 0)
 
   const products = list.data ?? []
   const categories = categoriesQuery.data ?? []
@@ -143,6 +148,17 @@ export default function Products() {
         }
         action={
           <Box sx={{ display: 'flex', gap: 1 }}>
+            <Badge badgeContent={activeFilterCount} color="primary" overlap="rectangular">
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<FilterIcon className="w-4 h-4" />}
+                onClick={() => setFilterOpen(true)}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                Filter
+              </Button>
+            </Badge>
             <Button
               variant="outlined"
               color="primary"
@@ -171,6 +187,28 @@ export default function Products() {
       {!categoriesQuery.isLoading && categories.length === 0 && (
         <Box sx={{ mb: 2, p: 2, borderRadius: 2, bgcolor: '#FFF8DC', border: '1px solid #1F1F1F', fontSize: 14, color: '#1F1F1F' }}>
           No categories exist on the backend yet. Insert at least one category row before adding products.
+        </Box>
+      )}
+
+      {activeFilterCount > 0 && (
+        <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+          {filters.search && (
+            <Chip
+              label={`Search: "${filters.search}"`}
+              size="small"
+              onDelete={() => setFilters(f => ({ ...f, search: undefined }))}
+            />
+          )}
+          {filters.categoryId != null && (
+            <Chip
+              label={`Category: ${categories.find(c => c.id === filters.categoryId)?.name ?? filters.categoryId}`}
+              size="small"
+              onDelete={() => setFilters(f => ({ ...f, categoryId: undefined }))}
+            />
+          )}
+          <Button size="small" onClick={() => setFilters({})} sx={{ textTransform: 'none' }}>
+            Clear all
+          </Button>
         </Box>
       )}
 
@@ -210,6 +248,14 @@ export default function Products() {
       <ImportProductsDialog
         open={importOpen}
         onClose={() => setImportOpen(false)}
+      />
+
+      <FilterProductsDialog
+        open={filterOpen}
+        filters={filters}
+        categories={categories}
+        onClose={() => setFilterOpen(false)}
+        onApply={(next) => { setFilters(next); setFilterOpen(false) }}
       />
     </div>
   )
@@ -531,6 +577,80 @@ function ImportProductsDialog({ open, onClose }: { open: boolean; onClose: () =>
           <Button onClick={handleClose} variant="contained" sx={{ textTransform: 'none', fontWeight: 600 }}>Close</Button>
         )}
       </DialogActions>
+    </Dialog>
+  )
+}
+
+function FilterProductsDialog({ open, filters, categories, onClose, onApply }: {
+  open: boolean
+  filters: ProductListFilters
+  categories: CategoryDto[]
+  onClose: () => void
+  onApply: (filters: ProductListFilters) => void
+}) {
+  const [search, setSearch] = useState('')
+  const [categoryId, setCategoryId] = useState<number | ''>('')
+
+  useEffect(() => {
+    if (!open) return
+    setSearch(filters.search ?? '')
+    setCategoryId(filters.categoryId ?? '')
+  }, [open, filters])
+
+  const handleApply = (e: React.FormEvent) => {
+    e.preventDefault()
+    onApply({
+      search: search.trim() || undefined,
+      categoryId: typeof categoryId === 'number' ? categoryId : undefined,
+    })
+  }
+
+  const handleClear = () => {
+    setSearch('')
+    setCategoryId('')
+    onApply({})
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth slotProps={{ paper: { sx: { borderRadius: 3 } } }}>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 600 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <FilterIcon className="w-5 h-5" />
+          Filter Products
+        </Box>
+        <IconButton size="small" onClick={onClose}><X className="w-4 h-4" /></IconButton>
+      </DialogTitle>
+      <form onSubmit={handleApply}>
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <TextField
+            label="Search by name or code"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            size="small"
+            placeholder="e.g. Murukku or P001"
+            autoFocus
+          />
+          <TextField
+            select
+            label="Category"
+            value={categoryId}
+            onChange={e => setCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
+            size="small"
+          >
+            <MenuItem value="">All categories</MenuItem>
+            {categories.map(c => (
+              <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+            ))}
+          </TextField>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
+          <Button onClick={handleClear} sx={{ textTransform: 'none', fontWeight: 500 }}>Clear all</Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button onClick={onClose} variant="outlined" color="secondary" sx={{ textTransform: 'none', fontWeight: 500 }}>Cancel</Button>
+            <Button type="submit" variant="contained" sx={{ textTransform: 'none', fontWeight: 600 }}>Apply</Button>
+          </Box>
+        </DialogActions>
+      </form>
     </Dialog>
   )
 }
