@@ -112,6 +112,162 @@ public class ProductService(
         if (!ok) throw new NotFoundException($"Product '{id}' not found.");
     }
 
+    // Bulk import — strict validation; if any row has a hard error, nothing is
+    // inserted. Rows whose `name` already exists are silently skipped (returned
+    // in the result, not treated as errors). For unknown categories we surface
+    // a "did you mean" hint based on Levenshtein distance — never auto-mapped.
+    public async Task<ImportProductsResult> ImportAsync(Stream fileStream, string fileName, CancellationToken ct = default)
+    {
+        var userId = currentUser.UserId
+            ?? throw new UnauthorizedException("Authenticated user required.");
+
+        List<ProductImportParser.RawRow> rawRows;
+        try { rawRows = ProductImportParser.Parse(fileStream, fileName); }
+        catch (Exception ex)
+        {
+            throw new ValidationException(new[] { new ValidationFailure("file", ex.Message) });
+        }
+
+        if (rawRows.Count == 0)
+            return new ImportProductsResult(0, 0, [], []);
+
+        var allCategories = await categories.ListAsync(ct);
+        var categoryByName = allCategories.ToDictionary(c => c.Name.Trim(), c => c, StringComparer.OrdinalIgnoreCase);
+        var existingNames = (await products.ListAsync(null, null, ct))
+            .Select(p => p.Name.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var errors = new List<ImportProductError>();
+        var skipped = new List<ImportProductSkipped>();
+        var validated = new List<Product>();
+
+        foreach (var row in rawRows)
+        {
+            var rowErrors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(row.Name))
+                rowErrors.Add("name is required");
+            if (string.IsNullOrWhiteSpace(row.Category))
+                rowErrors.Add("category is required");
+            if (string.IsNullOrWhiteSpace(row.Type))
+                rowErrors.Add("type is required");
+
+            Category? category = null;
+            if (!string.IsNullOrWhiteSpace(row.Category))
+            {
+                if (!categoryByName.TryGetValue(row.Category.Trim(), out category))
+                {
+                    var suggestion = SuggestCategory(row.Category!, allCategories);
+                    rowErrors.Add(suggestion is null
+                        ? $"category \"{row.Category}\" not found"
+                        : $"category \"{row.Category}\" not found — did you mean \"{suggestion}\"?");
+                }
+            }
+
+            if (!TryParseDecimal(row.Mrp, out var mrp) || mrp < 0)
+                rowErrors.Add("mrp must be a non-negative number");
+            if (!TryParseDecimal(row.PurchasePrice, out var pp) || pp < 0)
+                rowErrors.Add("purchase_price must be a non-negative number");
+
+            decimal? weightValue = null;
+            if (!string.IsNullOrWhiteSpace(row.WeightValue))
+            {
+                if (!TryParseDecimal(row.WeightValue, out var w) || w <= 0)
+                    rowErrors.Add("weight_value must be a positive number when provided");
+                else weightValue = w;
+            }
+
+            var weightUnit = (row.WeightUnit ?? "g").Trim().ToLowerInvariant();
+            if (weightUnit is not ("g" or "kg")) rowErrors.Add("weight_unit must be 'g' or 'kg'");
+
+            var active = ParseActive(row.Active);
+
+            if (rowErrors.Count > 0)
+            {
+                errors.Add(new ImportProductError(row.RowNumber, string.Join("; ", rowErrors)));
+                continue;
+            }
+
+            // Hard errors check passed — now soft-skip duplicates.
+            if (existingNames.Contains(row.Name!.Trim()))
+            {
+                skipped.Add(new ImportProductSkipped(row.RowNumber, row.Name!.Trim(), "name already exists"));
+                continue;
+            }
+
+            validated.Add(new Product
+            {
+                Name           = row.Name!.Trim(),
+                CategoryId     = category!.Id,
+                Type           = row.Type!.Trim(),
+                WeightValue    = weightValue,
+                WeightUnit     = weightUnit,
+                Mrp            = mrp,
+                PurchasePrice  = pp,
+                Active         = active,
+            });
+        }
+
+        // Hard errors? Bail without inserting anything (all-or-nothing).
+        if (errors.Count > 0)
+            return new ImportProductsResult(rawRows.Count, 0, [], errors);
+
+        var imported = 0;
+        foreach (var p in validated)
+        {
+            p.Code = await products.NextCodeAsync(ct);
+            await products.CreateAsync(p, userId, ct);
+            imported++;
+        }
+
+        return new ImportProductsResult(rawRows.Count, imported, skipped, []);
+    }
+
+    private static bool TryParseDecimal(string? raw, out decimal value)
+    {
+        value = 0;
+        if (string.IsNullOrWhiteSpace(raw)) return false;
+        return decimal.TryParse(raw.Trim(), System.Globalization.NumberStyles.Number,
+            System.Globalization.CultureInfo.InvariantCulture, out value);
+    }
+
+    private static bool ParseActive(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return true;
+        var v = raw.Trim().ToLowerInvariant();
+        return v is "yes" or "y" or "true" or "1" or "active";
+    }
+
+    private static string? SuggestCategory(string typo, IReadOnlyList<Category> all)
+    {
+        // Suggest only if the closest existing category is reasonably near (<= 3 edits).
+        var best = all
+            .Select(c => (c.Name, Distance: Levenshtein(typo.Trim().ToLowerInvariant(), c.Name.Trim().ToLowerInvariant())))
+            .OrderBy(x => x.Distance)
+            .FirstOrDefault();
+        return best.Distance <= 3 ? best.Name : null;
+    }
+
+    private static int Levenshtein(string a, string b)
+    {
+        if (a.Length == 0) return b.Length;
+        if (b.Length == 0) return a.Length;
+        var prev = new int[b.Length + 1];
+        var curr = new int[b.Length + 1];
+        for (var j = 0; j <= b.Length; j++) prev[j] = j;
+        for (var i = 1; i <= a.Length; i++)
+        {
+            curr[0] = i;
+            for (var j = 1; j <= b.Length; j++)
+            {
+                var cost = a[i - 1] == b[j - 1] ? 0 : 1;
+                curr[j] = Math.Min(Math.Min(curr[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            }
+            (prev, curr) = (curr, prev);
+        }
+        return prev[b.Length];
+    }
+
     private ProductDto MapToDto(Product p)
     {
         var hidePurchase = string.Equals(currentUser.Role, "ShopUser", StringComparison.OrdinalIgnoreCase);

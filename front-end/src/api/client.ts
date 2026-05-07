@@ -26,10 +26,12 @@ type RequestOpts = {
 }
 
 async function request<T>(method: HttpMethod, path: string, body?: unknown, opts: RequestOpts = {}): Promise<T> {
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
   const headers: Record<string, string> = {
     Accept: 'application/json',
   }
-  if (body !== undefined) {
+  // FormData sets its own multipart boundary — don't override Content-Type.
+  if (body !== undefined && !isFormData) {
     headers['Content-Type'] = 'application/json'
   }
 
@@ -42,7 +44,7 @@ async function request<T>(method: HttpMethod, path: string, body?: unknown, opts
   const response = await fetch(url, {
     method,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: body === undefined ? undefined : (isFormData ? (body as FormData) : JSON.stringify(body)),
     signal: opts.signal,
   })
 

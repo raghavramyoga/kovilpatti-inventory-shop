@@ -56,3 +56,14 @@ export function useDeleteProduct() {
     },
   })
 }
+
+export function useImportProducts() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) => productsApi.import(file),
+    onSuccess: (result) => {
+      // Only invalidate when something was actually inserted.
+      if (result.imported > 0) qc.invalidateQueries({ queryKey: productsKeys.all })
+    },
+  })
+}

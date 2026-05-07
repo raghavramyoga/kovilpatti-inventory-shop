@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Plus, Edit2, Trash2, X, Package } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Plus, Edit2, Trash2, X, Package, Upload } from 'lucide-react'
 import {
   Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   FormControlLabel, IconButton, MenuItem, Paper, TextField,
@@ -7,10 +7,10 @@ import {
 import { DataGrid, type GridColDef } from '@mui/x-data-grid'
 import PageHeader from '../components/PageHeader'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../hooks/useProducts'
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useImportProducts } from '../hooks/useProducts'
 import { useCategories } from '../hooks/useCategories'
 import type {
-  ProductDto, CreateProductRequest, UpdateProductRequest,
+  ProductDto, CreateProductRequest, UpdateProductRequest, ImportProductsResult,
 } from '../api/products/types'
 import type { CategoryDto } from '../api/categories/types'
 import { ValidationError } from '../api/errors'
@@ -41,6 +41,7 @@ export default function Products() {
 
   const [formMode, setFormMode] = useState<FormMode>({ kind: 'closed' })
   const [pendingDelete, setPendingDelete] = useState<ProductDto | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
 
   const products = list.data ?? []
   const categories = categoriesQuery.data ?? []
@@ -141,16 +142,27 @@ export default function Products() {
             : `${products.length} ${products.length === 1 ? 'product' : 'products'} in catalog`
         }
         action={
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<Plus className="w-4 h-4" />}
-            onClick={() => setFormMode({ kind: 'create' })}
-            sx={{ textTransform: 'none', fontWeight: 600 }}
-            disabled={categories.length === 0 || categoriesQuery.isLoading}
-          >
-            Add Product
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="outlined"
+              color="primary"
+              startIcon={<Upload className="w-4 h-4" />}
+              onClick={() => setImportOpen(true)}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              Import Products
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Plus className="w-4 h-4" />}
+              onClick={() => setFormMode({ kind: 'create' })}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+              disabled={categories.length === 0 || categoriesQuery.isLoading}
+            >
+              Add Product
+            </Button>
+          </Box>
         }
       />
 
@@ -193,6 +205,11 @@ export default function Products() {
         confirmLabel="Delete"
         onConfirm={handleConfirmDelete}
         onCancel={() => setPendingDelete(null)}
+      />
+
+      <ImportProductsDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
       />
     </div>
   )
@@ -356,6 +373,164 @@ function ProductFormDialog({ open, product, categories, submitting, submitError,
           </Button>
         </DialogActions>
       </form>
+    </Dialog>
+  )
+}
+
+function ImportProductsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [file, setFile] = useState<File | null>(null)
+  const [result, setResult] = useState<ImportProductsResult | null>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const importMutation = useImportProducts()
+
+  const submitting = importMutation.isPending
+  const apiError = importMutation.error instanceof Error ? importMutation.error.message : null
+
+  const handleClose = () => {
+    if (submitting) return
+    setFile(null)
+    setResult(null)
+    setFileError(null)
+    importMutation.reset()
+    if (inputRef.current) inputRef.current.value = ''
+    onClose()
+  }
+
+  const handleFile = (f: File | null) => {
+    setFileError(null)
+    setResult(null)
+    if (!f) { setFile(null); return }
+    const ext = f.name.toLowerCase().split('.').pop() ?? ''
+    if (ext !== 'xlsx' && ext !== 'csv') {
+      setFileError('Only .xlsx and .csv files are supported.')
+      setFile(null)
+      return
+    }
+    setFile(f)
+  }
+
+  const handleSubmit = async () => {
+    if (!file) return
+    try {
+      const res = await importMutation.mutateAsync(file)
+      setResult(res)
+    } catch {
+      // Surface via apiError above.
+    }
+  }
+
+  return (
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth slotProps={{ paper: { sx: { borderRadius: 3 } } }}>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 600 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Upload className="w-5 h-5" />
+          Import Products
+        </Box>
+        <IconButton size="small" onClick={handleClose} disabled={submitting}><X className="w-4 h-4" /></IconButton>
+      </DialogTitle>
+      <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {!result && (
+          <>
+            <Box sx={{ fontSize: 13, color: '#1F1F1F' }}>
+              <p style={{ marginBottom: 8 }}>
+                Upload a <b>.xlsx</b> or <b>.csv</b> file with the columns:
+              </p>
+              <Box component="code" sx={{ display: 'block', p: 1.5, bgcolor: '#FFF8DC', borderRadius: 1, border: '1px solid #1F1F1F', fontSize: 12 }}>
+                name, category, type, weight_value, weight_unit, mrp, purchase_price, active
+              </Box>
+              <p style={{ marginTop: 8, color: '#1F1F1F99' }}>
+                <b>category</b> must match an existing category name. Rows whose <b>name</b> already exists are skipped.
+                If any row has a hard error, no products are imported.
+              </p>
+            </Box>
+
+            <Button
+              variant="outlined"
+              component="label"
+              startIcon={<Upload className="w-4 h-4" />}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+              disabled={submitting}
+            >
+              {file ? 'Change file' : 'Choose file'}
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".xlsx,.csv"
+                hidden
+                onChange={e => handleFile(e.target.files?.[0] ?? null)}
+              />
+            </Button>
+            {file && (
+              <Box sx={{ fontSize: 13, color: '#1F1F1F' }}>
+                Selected: <b>{file.name}</b> ({Math.ceil(file.size / 1024)} KB)
+              </Box>
+            )}
+            {fileError && <Alert severity="error">{fileError}</Alert>}
+            {apiError && <Alert severity="error">{apiError}</Alert>}
+          </>
+        )}
+
+        {result && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {result.errors.length === 0 && result.imported > 0 && (
+              <Alert severity="success">
+                Imported <b>{result.imported}</b> of {result.totalRows} rows.
+                {result.skipped.length > 0 && ` (${result.skipped.length} skipped — already existed.)`}
+              </Alert>
+            )}
+            {result.errors.length === 0 && result.imported === 0 && (
+              <Alert severity="info">
+                No products imported. {result.skipped.length} of {result.totalRows} rows already existed.
+              </Alert>
+            )}
+            {result.errors.length > 0 && (
+              <Alert severity="error">
+                Import failed — {result.errors.length} row{result.errors.length === 1 ? '' : 's'} had errors. Nothing was imported. Fix the file and try again.
+              </Alert>
+            )}
+
+            {result.errors.length > 0 && (
+              <Box>
+                <Box sx={{ fontWeight: 600, mb: 1, fontSize: 13 }}>Errors:</Box>
+                <Box sx={{ maxHeight: 200, overflow: 'auto', border: '1px solid #1F1F1F', borderRadius: 1, p: 1, bgcolor: '#FFF8F8' }}>
+                  {result.errors.map(e => (
+                    <Box key={e.rowNumber} sx={{ fontSize: 12, mb: 0.5, fontFamily: 'monospace' }}>
+                      Row {e.rowNumber}: {e.message}
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            )}
+
+            {result.skipped.length > 0 && (
+              <Box>
+                <Box sx={{ fontWeight: 600, mb: 1, fontSize: 13 }}>Skipped (name already exists):</Box>
+                <Box sx={{ maxHeight: 160, overflow: 'auto', border: '1px solid #1F1F1F', borderRadius: 1, p: 1, bgcolor: '#FFF8DC' }}>
+                  {result.skipped.map(s => (
+                    <Box key={s.rowNumber} sx={{ fontSize: 12, mb: 0.5, fontFamily: 'monospace' }}>
+                      Row {s.rowNumber}: {s.name}
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            )}
+          </Box>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        {!result && (
+          <>
+            <Button onClick={handleClose} variant="outlined" color="secondary" disabled={submitting} sx={{ textTransform: 'none', fontWeight: 500 }}>Cancel</Button>
+            <Button onClick={handleSubmit} variant="contained" disabled={!file || submitting} sx={{ textTransform: 'none', fontWeight: 600 }}>
+              {submitting ? 'Importing…' : 'Import'}
+            </Button>
+          </>
+        )}
+        {result && (
+          <Button onClick={handleClose} variant="contained" sx={{ textTransform: 'none', fontWeight: 600 }}>Close</Button>
+        )}
+      </DialogActions>
     </Dialog>
   )
 }

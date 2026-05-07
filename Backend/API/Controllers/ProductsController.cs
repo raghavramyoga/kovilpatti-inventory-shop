@@ -41,4 +41,17 @@ public class ProductsController(IProductService products) : ControllerBase
         await products.DeleteAsync(id, ct);
         return NoContent();
     }
+
+    [HttpPost("import")]
+    [Authorize(Roles = "Admin")]
+    [RequestSizeLimit(5_000_000)] // 5 MB cap on the import file
+    public async Task<ActionResult<ImportProductsResult>> Import(IFormFile file, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { error = "Upload a non-empty .xlsx or .csv file." });
+
+        await using var stream = file.OpenReadStream();
+        var result = await products.ImportAsync(stream, file.FileName, ct);
+        return Ok(result);
+    }
 }

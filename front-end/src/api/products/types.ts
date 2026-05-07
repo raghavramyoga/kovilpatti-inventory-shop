@@ -41,3 +41,21 @@ export type ProductListFilters = {
   search?: string
   categoryId?: number
 }
+
+export type ImportProductError = {
+  rowNumber: number
+  message: string
+}
+
+export type ImportProductSkipped = {
+  rowNumber: number
+  name: string
+  reason: string
+}
+
+export type ImportProductsResult = {
+  totalRows: number
+  imported: number
+  skipped: ImportProductSkipped[]
+  errors: ImportProductError[]
+}

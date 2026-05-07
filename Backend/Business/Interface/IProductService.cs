@@ -9,4 +9,5 @@ public interface IProductService
     Task<ProductDto> CreateAsync(CreateProductRequest request, CancellationToken ct = default);
     Task<ProductDto> UpdateAsync(Guid id, UpdateProductRequest request, CancellationToken ct = default);
     Task DeleteAsync(Guid id, CancellationToken ct = default);
+    Task<ImportProductsResult> ImportAsync(Stream fileStream, string fileName, CancellationToken ct = default);
 }
