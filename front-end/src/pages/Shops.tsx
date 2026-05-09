@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, Edit2, Trash2, X, Store } from 'lucide-react'
 import {
   Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
@@ -74,7 +74,7 @@ export default function Shops() {
     }
   }
 
-  const columns: GridColDef<ShopDto>[] = [
+  const columns = useMemo<GridColDef<ShopDto>[]>(() => [
     { field: 'code',           headerName: 'Code',     width: 110, sortable: false, filterable: false },
     { field: 'name',           headerName: 'Shop Name', flex: 1.4, minWidth: 180, sortable: false, filterable: false },
     { field: 'address',        headerName: 'Address',  flex: 1.8, minWidth: 220, sortable: false, filterable: false },
@@ -116,7 +116,7 @@ export default function Shops() {
         </Box>
       ),
     },
-  ]
+  ], [])
 
   const errorMessage = list.isError
     ? (list.error instanceof Error ? list.error.message : 'Failed to load shops.')
@@ -160,6 +160,7 @@ export default function Shops() {
           columns={columns}
           getRowId={r => r.id}
           loading={list.isLoading}
+          autoHeight
           disableRowSelectionOnClick
           disableColumnMenu
           initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}

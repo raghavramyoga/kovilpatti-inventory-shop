@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, Edit2, Trash2, X, User as UserIcon, KeyRound } from 'lucide-react'
 import {
   Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
@@ -96,7 +96,7 @@ export default function Staff() {
     }
   }
 
-  const columns: GridColDef<UserDto>[] = [
+  const columns = useMemo<GridColDef<UserDto>[]>(() => [
     { field: 'username', headerName: 'Username', width: 150, sortable: false, filterable: false },
     { field: 'fullName', headerName: 'Full Name', flex: 1.2, minWidth: 180, sortable: false, filterable: false },
     {
@@ -141,7 +141,7 @@ export default function Staff() {
         </Box>
       ),
     },
-  ]
+  ], [])
 
   const canAdd = shops.length > 0 || inventories.length > 0
   const errorMessage = list.isError
@@ -186,6 +186,7 @@ export default function Staff() {
           columns={columns}
           getRowId={r => r.id}
           loading={list.isLoading}
+          autoHeight
           disableRowSelectionOnClick
           disableColumnMenu
           initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, Edit2, Trash2, X, Warehouse } from 'lucide-react'
 import {
   Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
@@ -73,7 +73,7 @@ export default function Inventories() {
     }
   }
 
-  const columns: GridColDef<InventoryDto>[] = [
+  const columns = useMemo<GridColDef<InventoryDto>[]>(() => [
     { field: 'code',              headerName: 'Code',           width: 110, sortable: false, filterable: false },
     { field: 'name',              headerName: 'Name',           flex: 1.4, minWidth: 180, sortable: false, filterable: false },
     { field: 'address',           headerName: 'Address',        flex: 2, minWidth: 240, sortable: false, filterable: false },
@@ -107,7 +107,7 @@ export default function Inventories() {
         </Box>
       ),
     },
-  ]
+  ], [])
 
   const errorMessage = list.isError
     ? (list.error instanceof Error ? list.error.message : 'Failed to load inventories.')
@@ -146,6 +146,7 @@ export default function Inventories() {
           columns={columns}
           getRowId={r => r.id}
           loading={list.isLoading}
+          autoHeight
           disableRowSelectionOnClick
           disableColumnMenu
           initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}

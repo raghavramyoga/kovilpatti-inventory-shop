@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Edit2, Trash2, X, Package, Upload, Filter as FilterIcon } from 'lucide-react'
 import {
   Alert, Badge, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
@@ -84,7 +84,7 @@ export default function Products() {
     }
   }
 
-  const columns: GridColDef<ProductDto>[] = [
+  const columns = useMemo<GridColDef<ProductDto>[]>(() => [
     { field: 'code',         headerName: 'Code',         width: 100, sortable: false, filterable: false },
     { field: 'name',         headerName: 'Product Name', flex: 1.5,  minWidth: 200, sortable: false, filterable: false },
     {
@@ -131,7 +131,7 @@ export default function Products() {
         </Box>
       ),
     },
-  ]
+  ], [])
 
   const errorMessage = list.isError
     ? (list.error instanceof Error ? list.error.message : 'Failed to load products.')
@@ -219,6 +219,7 @@ export default function Products() {
           columns={columns}
           getRowId={r => r.id}
           loading={list.isLoading}
+          autoHeight
           disableRowSelectionOnClick
           disableColumnMenu
           initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
