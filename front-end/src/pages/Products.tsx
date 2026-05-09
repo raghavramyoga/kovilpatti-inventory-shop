@@ -357,7 +357,10 @@ function ProductFormDialog({ open, product, categories, submitting, submitError,
                 <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
               ))}
             </TextField>
-            <TextField label="Type" value={type} onChange={e => setType(e.target.value)} placeholder="pack / bottle / jar" required size="small" disabled={submitting} />
+            <TextField select label="Type" value={type} onChange={e => setType(e.target.value)} required size="small" disabled={submitting}>
+              <MenuItem value="pack">Pack</MenuItem>
+              <MenuItem value="jar">Jar</MenuItem>
+            </TextField>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <TextField
